@@ -3,44 +3,51 @@ package keeper
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
+	"github.com/tendermint/tendermint/libs/log"
 
 	"github.com/cosmos/cosmos-sdk/store/prefix"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 type WasmSnapshot struct {
+	logger log.Logger
 	keeper *Keeper
-	multi  storetypes.CommitMultiStore
 }
 
-func NewWasmSnapshot(multi storetypes.CommitMultiStore, keeper *Keeper) *WasmSnapshot {
+func NewWasmSnapshot(logger log.Logger, keeper *Keeper) *WasmSnapshot {
 	return &WasmSnapshot{
+		logger: logger,
 		keeper: keeper,
-		multi:  multi,
 	}
 }
 
-func (ws WasmSnapshot) GetItems() ([]storetypes.SnapshotCustomItem, error) {
+func (ws WasmSnapshot) GetItems(store storetypes.MultiStore) ([]storetypes.SnapshotCustomItem, error) {
+	ws.logger.Info("Wasm Sync: snapshot start")
 	items := []storetypes.SnapshotCustomItem{}
-	store := ws.multi.GetKVStore(ws.keeper.storeKey)
-	prefixStore := prefix.NewStore(store, types.CodeKeyPrefix)
+	wasmstore := store.GetKVStore(ws.keeper.storeKey)
+	ws.logger.Info("Wasm Sync: store key: " + ws.keeper.storeKey.String())
+	prefixStore := prefix.NewStore(wasmstore, types.CodeKeyPrefix)
 	iter := prefixStore.Iterator(nil, nil)
+	ws.logger.Info("Wasm Sync:Start iteration")
 	for ; iter.Valid(); iter.Next() {
+		codeID := binary.BigEndian.Uint64(iter.Key())
+		ws.logger.Info(fmt.Sprintf("Wasm Sync: found codeID: %d", codeID))
 		var c types.CodeInfo
 		ws.keeper.cdc.MustUnmarshal(iter.Value(), &c)
-		codeID := binary.BigEndian.Uint64(iter.Key())
-		// cb returns true to stop early
-		bytecode, err := ws.GetByteCode(store, codeID)
+
+		ws.logger.Info("Wasm Sync: parse code creator: " + c.Creator)
+		bytecode, err := ws.keeper.wasmVM.GetCode(c.CodeHash)
 		if err != nil {
 			return nil, err
 		}
 
+		ws.logger.Info("Wasm Sync: add wasmcode to items")
 		items = append(items, storetypes.SnapshotCustomItem{
-			Key:   string(c.CodeHash),
+			Key:   c.CodeHash,
 			Value: bytecode,
 		})
 	}
@@ -48,24 +55,17 @@ func (ws WasmSnapshot) GetItems() ([]storetypes.SnapshotCustomItem, error) {
 	return items, nil
 }
 
-func (ws WasmSnapshot) RestoreItem(item *storetypes.SnapshotCustomItem) error {
+func (ws WasmSnapshot) RestoreItem(store storetypes.MultiStore, item *storetypes.SnapshotCustomItem) error {
+	ws.logger.Info("Wasm Restore: restore item")
 	newCodeHash, err := ws.keeper.wasmVM.Create(item.Value)
 	if err != nil {
 		return sdkerrors.Wrap(types.ErrCreateFailed, err.Error())
 	}
-	if !bytes.Equal([]byte(item.Key), newCodeHash) {
+	ws.logger.Info("Wasm Restore: saved code, and get hash")
+	if !bytes.Equal(item.Key, newCodeHash) {
 		return sdkerrors.Wrap(types.ErrInvalid, "code hashes not same")
 	}
+	ws.logger.Info("Wasm Restore: validated code hash")
 
 	return nil
-}
-
-func (ws WasmSnapshot) GetByteCode(store sdk.KVStore, codeID uint64) ([]byte, error) {
-	var codeInfo types.CodeInfo
-	codeInfoBz := store.Get(types.GetCodeKey(codeID))
-	if codeInfoBz == nil {
-		return nil, nil
-	}
-	ws.keeper.cdc.MustUnmarshal(codeInfoBz, &codeInfo)
-	return ws.keeper.wasmVM.GetCode(codeInfo.CodeHash)
 }
