@@ -122,6 +122,7 @@ require (
 )
 
 replace (
+	github.com/cosmos/cosmos-sdk => github.com/disperze/cosmos-sdk v0.44.4-0.20220122192623-6f719fdfa74c
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	google.golang.org/grpc => google.golang.org/grpc v1.33.2
 )
