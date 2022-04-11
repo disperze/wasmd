@@ -75,7 +75,7 @@ func (ws *WasmSnapshotter) Snapshot(height uint64, protoWriter protoio.Writer) e
 			PinCode:      pinCode,
 			WASMByteCode: bytecode,
 		}
-		data, err := types.ModuleCdc.Marshal(&item)
+		data, err := ws.keeper.cdc.Marshal(&item)
 		if err != nil {
 			return sdkerrors.Wrap(err, "cannot encode protobuf wasm message")
 		}
@@ -104,7 +104,7 @@ func (ws WasmSnapshotter) Restore(height uint64, format uint32, protoReader prot
 		}
 
 		var wasmItem types.SnapshotWasmItem
-		err = types.ModuleCdc.Unmarshal(extension.Payload, &wasmItem)
+		err = ws.keeper.cdc.Unmarshal(extension.Payload, &wasmItem)
 		if err != nil {
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(err, "invalid protobuf wasm message")
 		}
