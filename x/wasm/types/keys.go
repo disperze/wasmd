@@ -19,6 +19,9 @@ const (
 
 	// RouterKey is the msg router key for the wasm module
 	RouterKey = ModuleName
+
+	// SnapshotFormat is the current format for wasm snapshotter
+	SnapshotFormat = 1
 )
 
 // nolint
