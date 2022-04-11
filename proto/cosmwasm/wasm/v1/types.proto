@@ -138,3 +138,13 @@ message Model {
   // base64-encode raw value
   bytes value = 2;
 }
+
+// SnapshotWasmItem model to store wasm data in a snapshot
+message SnapshotWasmItem {
+  // CodeHash is the unique identifier created by wasmvm
+  bytes code_hash = 1;
+  // PinCode pin a code id in the wasmvm cache.
+  bool pin_code = 2;
+  // WASMByteCode can be raw or gzip compressed
+  bytes wasm_byte_code = 3 [ (gogoproto.customname) = "WASMByteCode" ];
+}
