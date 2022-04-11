@@ -13,6 +13,7 @@
     - [ContractInfo](#cosmwasm.wasm.v1.ContractInfo)
     - [Model](#cosmwasm.wasm.v1.Model)
     - [Params](#cosmwasm.wasm.v1.Params)
+    - [SnapshotWasmItem](#cosmwasm.wasm.v1.SnapshotWasmItem)
   
     - [AccessType](#cosmwasm.wasm.v1.AccessType)
     - [ContractCodeHistoryOperationType](#cosmwasm.wasm.v1.ContractCodeHistoryOperationType)
@@ -220,6 +221,23 @@ Params defines the set of wasm parameters.
 | `code_upload_access` | [AccessConfig](#cosmwasm.wasm.v1.AccessConfig) |  |  |
 | `instantiate_default_permission` | [AccessType](#cosmwasm.wasm.v1.AccessType) |  |  |
 | `max_wasm_code_size` | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="cosmwasm.wasm.v1.SnapshotWasmItem"></a>
+
+### SnapshotWasmItem
+SnapshotWasmItem model to store wasm data in a snapshot
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `code_hash` | [bytes](#bytes) |  | CodeHash is the unique identifier created by wasmvm |
+| `pin_code` | [bool](#bool) |  | PinCode pin a code id in the wasmvm cache. |
+| `wasm_byte_code` | [bytes](#bytes) |  | WASMByteCode can be raw or gzip compressed |
 
 
 
