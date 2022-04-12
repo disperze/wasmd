@@ -235,8 +235,7 @@ SnapshotWasmItem model to store wasm data in a snapshot
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| `code_hash` | [bytes](#bytes) |  | CodeHash is the unique identifier created by wasmvm |
-| `pin_code` | [bool](#bool) |  | PinCode pin a code id in the wasmvm cache. |
+| `code_id` | [uint64](#uint64) |  | CodeID is the reference to the stored Wasm code |
 | `wasm_byte_code` | [bytes](#bytes) |  | WASMByteCode can be raw or gzip compressed |
 
 
