@@ -3,6 +3,7 @@ package keeper
 import (
 	"bytes"
 	"encoding/binary"
+	"sort"
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
 
@@ -56,14 +57,17 @@ func (ws *WasmSnapshotter) Snapshot(height uint64, protoWriter protoio.Writer) e
 	iter := prefixStore.Iterator(nil, nil)
 	defer iter.Close()
 
+	hashes := make(map[string]bool)
+	var items []types.SnapshotWasmItem
 	for ; iter.Valid(); iter.Next() {
 		var c types.CodeInfo
 		ws.keeper.cdc.MustUnmarshal(iter.Value(), &c)
 		codeID := binary.BigEndian.Uint64(iter.Key())
-		pinCode := false
-		if store.Has(types.GetPinnedCodeIndexPrefix(codeID)) {
-			pinCode = true
+
+		if _, ok := hashes[string(c.CodeHash)]; ok {
+			continue
 		}
+		hashes[string(c.CodeHash)] = true
 
 		bytecode, err := ws.keeper.wasmVM.GetCode(c.CodeHash)
 		if err != nil {
@@ -71,10 +75,17 @@ func (ws *WasmSnapshotter) Snapshot(height uint64, protoWriter protoio.Writer) e
 		}
 
 		item := types.SnapshotWasmItem{
-			CodeHash:     c.CodeHash,
-			PinCode:      pinCode,
+			CodeID:       codeID,
 			WASMByteCode: bytecode,
 		}
+		items = append(items, item)
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].CodeID < items[j].CodeID
+	})
+
+	for _, item := range items {
 		data, err := ws.keeper.cdc.Marshal(&item)
 		if err != nil {
 			return sdkerrors.Wrap(err, "cannot encode protobuf wasm message")
@@ -82,7 +93,6 @@ func (ws *WasmSnapshotter) Snapshot(height uint64, protoWriter protoio.Writer) e
 
 		snapshottypes.WriteExtensionItem(protoWriter, data)
 	}
-	// TODO: sort codes by codeID, and remove duplicate code hashes.
 
 	return nil
 }
@@ -90,7 +100,12 @@ func (ws *WasmSnapshotter) Snapshot(height uint64, protoWriter protoio.Writer) e
 // Restore implements types.Snapshotter
 func (ws WasmSnapshotter) Restore(height uint64, format uint32, protoReader protoio.Reader) (snapshottypes.SnapshotItem, error) {
 	var snapshotItem snapshottypes.SnapshotItem
+	cacheMS, err := ws.cms.CacheMultiStoreWithVersion(int64(height))
+	if err != nil {
+		return snapshotItem, err
+	}
 
+	store := cacheMS.GetKVStore(ws.storeKey)
 	for {
 		snapshotItem = snapshottypes.SnapshotItem{}
 		err := protoReader.ReadMsg(&snapshotItem)
@@ -109,16 +124,22 @@ func (ws WasmSnapshotter) Restore(height uint64, format uint32, protoReader prot
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(err, "invalid protobuf wasm message")
 		}
 
+		var codeInfo = ws.getCodeInfo(store, wasmItem.CodeID)
+		if codeInfo == nil {
+			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(types.ErrInvalid, "code info not found")
+		}
+
 		codeHash, err := ws.keeper.wasmVM.Create(wasmItem.WASMByteCode)
 		if err != nil {
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(types.ErrCreateFailed, err.Error())
 		}
 
-		if !bytes.Equal(wasmItem.CodeHash, codeHash) {
+		if !bytes.Equal(codeInfo.CodeHash, codeHash) {
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(types.ErrInvalid, "code hashes not same")
 		}
 
-		if !wasmItem.PinCode {
+		// Check pin code
+		if !store.Has(types.GetPinnedCodeIndexPrefix(wasmItem.CodeID)) {
 			continue
 		}
 
@@ -128,4 +149,14 @@ func (ws WasmSnapshotter) Restore(height uint64, format uint32, protoReader prot
 	}
 
 	return snapshotItem, nil
+}
+
+func (ws WasmSnapshotter) getCodeInfo(store storetypes.KVStore, codeID uint64) *types.CodeInfo {
+	var codeInfo types.CodeInfo
+	codeInfoBz := store.Get(types.GetCodeKey(codeID))
+	if codeInfoBz == nil {
+		return nil
+	}
+	ws.keeper.cdc.MustUnmarshal(codeInfoBz, &codeInfo)
+	return &codeInfo
 }
