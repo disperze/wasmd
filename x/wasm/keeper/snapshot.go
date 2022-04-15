@@ -52,41 +52,49 @@ func (ws *WasmSnapshotter) Snapshot(height uint64, protoWriter protoio.Writer) e
 		return err
 	}
 
-	store := cacheMS.GetKVStore(ws.storeKey)
-	prefixStore := prefix.NewStore(store, types.CodeKeyPrefix)
+	prefixStore := prefix.NewStore(cacheMS.GetKVStore(ws.storeKey), types.CodeKeyPrefix)
 	iter := prefixStore.Iterator(nil, nil)
 	defer iter.Close()
 
-	hashes := make(map[string]bool)
-	var items []types.SnapshotWasmItem
+	type codeItem struct {
+		CodeID   uint64
+		CodeHash []byte
+	}
+	uniqueHashes := make(map[string]bool)
+	codeItems := []codeItem{}
+
 	for ; iter.Valid(); iter.Next() {
 		var c types.CodeInfo
 		ws.keeper.cdc.MustUnmarshal(iter.Value(), &c)
 		codeID := binary.BigEndian.Uint64(iter.Key())
 
-		if _, ok := hashes[string(c.CodeHash)]; ok {
+		if _, ok := uniqueHashes[string(c.CodeHash)]; ok {
 			continue
 		}
-		hashes[string(c.CodeHash)] = true
+		uniqueHashes[string(c.CodeHash)] = true
 
-		bytecode, err := ws.keeper.wasmVM.GetCode(c.CodeHash)
+		codeItems = append(codeItems, codeItem{
+			CodeID:   codeID,
+			CodeHash: c.CodeHash,
+		})
+	}
+
+	sort.Slice(codeItems, func(i, j int) bool {
+		return codeItems[i].CodeID < codeItems[j].CodeID
+	})
+
+	for _, item := range codeItems {
+		bytecode, err := ws.keeper.wasmVM.GetCode(item.CodeHash)
 		if err != nil {
 			return err
 		}
 
-		item := types.SnapshotWasmItem{
-			CodeID:       codeID,
+		wasmItem := types.SnapshotWasmItem{
+			CodeID:       item.CodeID,
 			WASMByteCode: bytecode,
 		}
-		items = append(items, item)
-	}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].CodeID < items[j].CodeID
-	})
-
-	for _, item := range items {
-		data, err := ws.keeper.cdc.Marshal(&item)
+		data, err := ws.keeper.cdc.Marshal(&wasmItem)
 		if err != nil {
 			return sdkerrors.Wrap(err, "cannot encode protobuf wasm message")
 		}
@@ -137,16 +145,8 @@ func (ws WasmSnapshotter) Restore(height uint64, format uint32, protoReader prot
 		if !bytes.Equal(codeInfo.CodeHash, codeHash) {
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(types.ErrInvalid, "code hashes not same")
 		}
-
-		// Check pin code
-		if !store.Has(types.GetPinnedCodeIndexPrefix(wasmItem.CodeID)) {
-			continue
-		}
-
-		if err := ws.keeper.wasmVM.Pin(codeHash); err != nil {
-			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(types.ErrPinContractFailed, err.Error())
-		}
 	}
+	// TODO: Initialize pin codes
 
 	return snapshotItem, nil
 }
