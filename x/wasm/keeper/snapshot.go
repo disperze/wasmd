@@ -17,16 +17,14 @@ import (
 var _ snapshottypes.ExtensionSnapshotter = (*Snapshotter)(nil)
 
 type Snapshotter struct {
-	cms      storetypes.MultiStore
-	storeKey storetypes.StoreKey
-	keeper   *Keeper
+	cms    storetypes.MultiStore
+	keeper *Keeper
 }
 
-func NewSnapshotter(cms storetypes.MultiStore, storeKey storetypes.StoreKey, keeper *Keeper) *Snapshotter {
+func NewSnapshotter(cms storetypes.MultiStore, keeper *Keeper) *Snapshotter {
 	return &Snapshotter{
-		cms:      cms,
-		storeKey: storeKey,
-		keeper:   keeper,
+		cms:    cms,
+		keeper: keeper,
 	}
 }
 
@@ -52,7 +50,7 @@ func (ws *Snapshotter) Snapshot(height uint64, protoWriter protoio.Writer) error
 		return err
 	}
 
-	prefixStore := prefix.NewStore(cacheMS.GetKVStore(ws.storeKey), types.CodeKeyPrefix)
+	prefixStore := prefix.NewStore(cacheMS.GetKVStore(ws.keeper.storeKey), types.CodeKeyPrefix)
 	iter := prefixStore.Iterator(nil, nil)
 	defer iter.Close()
 
@@ -90,7 +88,7 @@ func (ws *Snapshotter) Snapshot(height uint64, protoWriter protoio.Writer) error
 		}
 
 		wasmItem := types.SnapshotWasmItem{
-			CodeID:       item.CodeID,
+			CodeHash:     item.CodeHash,
 			WASMByteCode: bytecode,
 		}
 
@@ -112,12 +110,6 @@ func (ws Snapshotter) Restore(height uint64, format uint32, protoReader protoio.
 	}
 
 	var snapshotItem snapshottypes.SnapshotItem
-	cacheMS, err := ws.cms.CacheMultiStoreWithVersion(int64(height))
-	if err != nil {
-		return snapshotItem, err
-	}
-
-	store := cacheMS.GetKVStore(ws.storeKey)
 	for {
 		snapshotItem = snapshottypes.SnapshotItem{}
 		err := protoReader.ReadMsg(&snapshotItem)
@@ -136,21 +128,15 @@ func (ws Snapshotter) Restore(height uint64, format uint32, protoReader protoio.
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(err, "invalid protobuf wasm message")
 		}
 
-		var codeInfo = ws.getCodeInfo(store, wasmItem.CodeID)
-		if codeInfo == nil {
-			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(types.ErrInvalid, "code info not found")
-		}
-
 		codeHash, err := ws.keeper.wasmVM.Create(wasmItem.WASMByteCode)
 		if err != nil {
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(types.ErrCreateFailed, err.Error())
 		}
 
-		if !bytes.Equal(codeInfo.CodeHash, codeHash) {
+		if !bytes.Equal(wasmItem.CodeHash, codeHash) {
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(types.ErrInvalid, "code hashes not same")
 		}
 	}
-	// TODO: Initialize pin codes?
 
 	return snapshotItem, nil
 }

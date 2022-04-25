@@ -141,8 +141,8 @@ message Model {
 
 // SnapshotWasmItem model to store wasm data in a snapshot
 message SnapshotWasmItem {
-  // CodeID is the reference to the stored Wasm code
-  uint64 code_id = 1 [ (gogoproto.customname) = "CodeID" ];
+  // CodeHash is the unique identifier created by wasmvm
+  bytes code_hash = 1;
   // WASMByteCode can be raw or gzip compressed
   bytes wasm_byte_code = 2 [ (gogoproto.customname) = "WASMByteCode" ];
 }
