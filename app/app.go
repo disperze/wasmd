@@ -643,9 +643,12 @@ func NewWasmApp(
 	app.MountKVStores(keys)
 	app.MountTransientStores(tkeys)
 	app.MountMemoryStores(memKeys)
-	app.SnapshotManager().RegisterExtensions(
-		wasm.NewWasmSnapshotter(app.CommitMultiStore(), keys[wasm.StoreKey], &app.wasmKeeper),
+	err = app.SnapshotManager().RegisterExtensions(
+		wasm.NewSnapshotter(app.CommitMultiStore(), keys[wasm.StoreKey], &app.wasmKeeper),
 	)
+	if err != nil {
+		panic(fmt.Errorf("failed to register wasm snapshotter: %s", err))
+	}
 
 	anteHandler, err := NewAnteHandler(
 		HandlerOptions{

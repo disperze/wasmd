@@ -74,7 +74,7 @@ var (
 	ContractFromPortID        = keeper.ContractFromPortID
 	WithWasmEngine            = keeper.WithWasmEngine
 	NewCountTXDecorator       = keeper.NewCountTXDecorator
-	NewWasmSnapshotter        = keeper.NewWasmSnapshotter
+	NewSnapshotter            = keeper.NewSnapshotter
 
 	// variable aliases
 	ModuleCdc            = types.ModuleCdc

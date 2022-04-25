@@ -14,16 +14,16 @@ import (
 	protoio "github.com/gogo/protobuf/io"
 )
 
-var _ snapshottypes.ExtensionSnapshotter = (*WasmSnapshotter)(nil)
+var _ snapshottypes.ExtensionSnapshotter = (*Snapshotter)(nil)
 
-type WasmSnapshotter struct {
+type Snapshotter struct {
 	cms      storetypes.MultiStore
 	storeKey storetypes.StoreKey
 	keeper   *Keeper
 }
 
-func NewWasmSnapshotter(cms storetypes.MultiStore, storeKey storetypes.StoreKey, keeper *Keeper) *WasmSnapshotter {
-	return &WasmSnapshotter{
+func NewSnapshotter(cms storetypes.MultiStore, storeKey storetypes.StoreKey, keeper *Keeper) *Snapshotter {
+	return &Snapshotter{
 		cms:      cms,
 		storeKey: storeKey,
 		keeper:   keeper,
@@ -31,22 +31,22 @@ func NewWasmSnapshotter(cms storetypes.MultiStore, storeKey storetypes.StoreKey,
 }
 
 // SnapshotName implements types.ExtensionSnapshotter
-func (*WasmSnapshotter) SnapshotName() string {
+func (*Snapshotter) SnapshotName() string {
 	return types.ModuleName
 }
 
 // SnapshotFormat implements types.ExtensionSnapshotter
-func (*WasmSnapshotter) SnapshotFormat() uint32 {
+func (*Snapshotter) SnapshotFormat() uint32 {
 	return types.SnapshotFormat
 }
 
 // SupportedFormats implements types.ExtensionSnapshotter
-func (*WasmSnapshotter) SupportedFormats() []uint32 {
+func (*Snapshotter) SupportedFormats() []uint32 {
 	return []uint32{types.SnapshotFormat}
 }
 
 // Snapshot implements types.Snapshotter
-func (ws *WasmSnapshotter) Snapshot(height uint64, protoWriter protoio.Writer) error {
+func (ws *Snapshotter) Snapshot(height uint64, protoWriter protoio.Writer) error {
 	cacheMS, err := ws.cms.CacheMultiStoreWithVersion(int64(height))
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ func (ws *WasmSnapshotter) Snapshot(height uint64, protoWriter protoio.Writer) e
 }
 
 // Restore implements types.Snapshotter
-func (ws WasmSnapshotter) Restore(height uint64, format uint32, protoReader protoio.Reader) (snapshottypes.SnapshotItem, error) {
+func (ws Snapshotter) Restore(height uint64, format uint32, protoReader protoio.Reader) (snapshottypes.SnapshotItem, error) {
 	if format == 0 {
 		return snapshottypes.SnapshotItem{}, snapshottypes.ErrUnknownFormat
 	}
@@ -155,7 +155,7 @@ func (ws WasmSnapshotter) Restore(height uint64, format uint32, protoReader prot
 	return snapshotItem, nil
 }
 
-func (ws WasmSnapshotter) getCodeInfo(store storetypes.KVStore, codeID uint64) *types.CodeInfo {
+func (ws Snapshotter) getCodeInfo(store storetypes.KVStore, codeID uint64) *types.CodeInfo {
 	var codeInfo types.CodeInfo
 	codeInfoBz := store.Get(types.GetCodeKey(codeID))
 	if codeInfoBz == nil {
