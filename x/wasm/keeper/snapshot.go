@@ -107,6 +107,10 @@ func (ws *WasmSnapshotter) Snapshot(height uint64, protoWriter protoio.Writer) e
 
 // Restore implements types.Snapshotter
 func (ws WasmSnapshotter) Restore(height uint64, format uint32, protoReader protoio.Reader) (snapshottypes.SnapshotItem, error) {
+	if format == 0 {
+		return snapshottypes.SnapshotItem{}, snapshottypes.ErrUnknownFormat
+	}
+
 	var snapshotItem snapshottypes.SnapshotItem
 	cacheMS, err := ws.cms.CacheMultiStoreWithVersion(int64(height))
 	if err != nil {
@@ -146,7 +150,7 @@ func (ws WasmSnapshotter) Restore(height uint64, format uint32, protoReader prot
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(types.ErrInvalid, "code hashes not same")
 		}
 	}
-	// TODO: Initialize pin codes
+	// TODO: Initialize pin codes?
 
 	return snapshotItem, nil
 }
