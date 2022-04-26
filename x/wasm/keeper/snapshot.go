@@ -121,6 +121,7 @@ func (ws Snapshotter) Restore(height uint64, format uint32, protoReader protoio.
 		}
 
 		extension := snapshotItem.GetExtensionPayload()
+		// break and return item to process other modules.
 		if extension == nil {
 			break
 		}
