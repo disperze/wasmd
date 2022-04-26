@@ -3,6 +3,7 @@ package keeper
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
 	"sort"
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
@@ -77,7 +78,7 @@ func (ws *Snapshotter) Snapshot(height uint64, protoWriter protoio.Writer) error
 		})
 	}
 
-	sort.Slice(codeItems, func(i, j int) bool {
+	sort.SliceStable(codeItems, func(i, j int) bool {
 		return codeItems[i].CodeID < codeItems[j].CodeID
 	})
 
@@ -105,7 +106,7 @@ func (ws *Snapshotter) Snapshot(height uint64, protoWriter protoio.Writer) error
 
 // Restore implements types.Snapshotter
 func (ws Snapshotter) Restore(height uint64, format uint32, protoReader protoio.Reader) (snapshottypes.SnapshotItem, error) {
-	if format == 0 {
+	if format != types.SnapshotFormat {
 		return snapshottypes.SnapshotItem{}, snapshottypes.ErrUnknownFormat
 	}
 
@@ -113,7 +114,9 @@ func (ws Snapshotter) Restore(height uint64, format uint32, protoReader protoio.
 	for {
 		snapshotItem = snapshottypes.SnapshotItem{}
 		err := protoReader.ReadMsg(&snapshotItem)
-		if err != nil {
+		if err == io.EOF {
+			break
+		} else if err != nil {
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(err, "invalid protobuf message")
 		}
 
