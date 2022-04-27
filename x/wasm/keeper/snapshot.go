@@ -141,6 +141,7 @@ func (ws Snapshotter) Restore(height uint64, format uint32, protoReader protoio.
 			return snapshottypes.SnapshotItem{}, sdkerrors.Wrap(types.ErrInvalid, "code hashes not same")
 		}
 	}
+	// TODO: iniitialize pin codes
 
 	return snapshotItem, nil
 }
