@@ -55,6 +55,28 @@ func (a ExecuteContractAuthorization) Accept(ctx sdk.Context, msg sdk.Msg) (auth
 		return authztypes.AcceptResponse{}, sdkerrors.ErrInvalidType.Wrap("type mismatch")
 	}
 
+	var allowed *AllowedContract
+	for _, allowedContract := range a.AllowedContracts {
+		if allowedContract.ContractAddress == exec.Contract {
+			allowed = allowedContract
+			break
+		}
+	}
+
+	if allowed == nil {
+		return authztypes.AcceptResponse{}, sdkerrors.ErrUnauthorized.Wrapf("cannot run %s contract", exec.Contract)
+	}
+
+	err := IsJSONObjectWithTopLevelKey(exec.Msg, allowed.AllowedMessages)
+	if err != nil {
+		return authztypes.AcceptResponse{}, sdkerrors.ErrUnauthorized.Wrapf("no allowed msg: %s", err.Error())
+	}
+
+	if allowed.Once {
+		return authztypes.AcceptResponse{Accept: true, Delete: true}, nil
+	}
+
+	return authztypes.AcceptResponse{Accept: true}, nil
 	update := []*AllowedContract{}
 	for _, allowedContract := range a.AllowedContracts {
 		if allowedContract.ContractAddress == exec.Contract {
