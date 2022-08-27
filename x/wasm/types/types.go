@@ -72,62 +72,7 @@ func (a ExecuteContractAuthorization) Accept(ctx sdk.Context, msg sdk.Msg) (auth
 		return authztypes.AcceptResponse{}, sdkerrors.ErrUnauthorized.Wrapf("no allowed msg: %s", err.Error())
 	}
 
-	if allowed.Once {
-		return authztypes.AcceptResponse{Accept: true, Delete: true}, nil
-	}
-
-	return authztypes.AcceptResponse{Accept: true}, nil
-	update := []*AllowedContract{}
-	for _, allowedContract := range a.AllowedContracts {
-		if allowedContract.ContractAddress == exec.Contract {
-			// if the allowed contract contains the contract address and there aren't allowed messages,
-			// then we accept the message.
-			if len(allowedContract.AllowedMessages) == 0 && !allowedContract.Once {
-				// if the permission is for multiple executions, we accept the message and keep
-				// it in the update array
-				update = append(update, allowedContract)
-				continue
-			} else if len(allowedContract.AllowedMessages) > 0 {
-				// otherwise we exclude it from the update array
-				continue
-			}
-
-			// NOTE: exec.Msg is base64 encoded, so we need to decode it first
-			// If there are allowedMessages then decode the call and check if the message is allowed
-			callBz := []byte{}
-			if _, err := base64.RawStdEncoding.Decode(exec.Msg.Bytes(), callBz); err != nil {
-				return authztypes.AcceptResponse{}, sdkerrors.Wrap(err, "failed to decode base64")
-			}
-
-			messageName := map[string]interface{}{}
-			if err := json.Unmarshal(callBz, &messageName); err != nil {
-				return authztypes.AcceptResponse{}, sdkerrors.Wrap(err, "failed to unmarshal json")
-			}
-
-			for _, allowedFunction := range allowedContract.AllowedMessages {
-				if len(messageName) != 1 {
-					return authztypes.AcceptResponse{}, sdkerrors.ErrInvalidRequest.Wrap("too many message calls in the same transaction")
-				}
-				for k := range messageName {
-					if allowedFunction == k {
-						if allowedContract.Once {
-							continue
-						} else {
-							update = append(update, allowedContract)
-							continue
-						}
-					}
-				}
-			}
-		} else {
-			// if the allowed contract doesn't contain the contract address, we add it to the update array
-			update = append(update, allowedContract)
-		}
-	}
-	if len(update) == 0 {
-		return authztypes.AcceptResponse{Accept: true, Delete: true}, nil
-	}
-	return authztypes.AcceptResponse{Accept: true, Updated: NewExecuteContractAuthorization(update)}, nil
+	return authztypes.AcceptResponse{Accept: true, Delete: allowed.Once}, nil
 }
 
 // ValidateBasic implements Authorization.ValidateBasic.
